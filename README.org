@@ -9,10 +9,11 @@
 
 This guide documents how to set up Emacs as a modern development environment, built entirely on packages that are either built-in or require minimal external dependencies. The approach favours Emacs's native infrastructure --- eglot over lsp-mode, flymake over flycheck, corfu over company --- and emphasises portability, including air-gapped and restricted environments.
 
-Two concrete worked examples are covered in detail:
+Three concrete worked examples are covered in detail:
 
 - *Java* (Linux): eglot + JDTLS + dape with java-debug-adapter
 - *C#/.NET* (Windows): eglot + csharp-ls + dape with netcoredbg
+- *Ada* (Linux/Windows): old ada-mode + eglot + gud/gdb
 
 The principles and patterns apply equally to any language with LSP and DAP support (Python, Go, Rust, C/C++, etc.).
 
@@ -226,13 +227,14 @@ cp -r tools/net9.0/any /path/to/emacs/bin/csharp-ls
 
 Eglot includes defaults for these (just install the server and add a hook):
 
-| Language   | Server              | Install                                 |
-|------------+---------------------+-----------------------------------------|
-| Python     | pylsp / pyright     | =pip install python-lsp-server= / =npm install -g pyright= |
-| Rust       | rust-analyzer       | =rustup component add rust-analyzer=      |
-| Go         | gopls               | =go install golang.org/x/tools/gopls@latest= |
-| C/C++      | clangd              | Ships with LLVM/Clang                   |
-| TypeScript | typescript-language-server | =npm install -g typescript-language-server= |
+| Language   | Server                     | Install                                                    |
+|------------+----------------------------+------------------------------------------------------------|
+| Python     | pylsp / pyright            | =pip install python-lsp-server= / =npm install -g pyright= |
+| Rust       | rust-analyzer              | =rustup component add rust-analyzer=                       |
+| Go         | gopls                      | =go install golang.org/x/tools/gopls@latest=               |
+| C/C++      | clangd                     | Ships with LLVM/Clang                                      |
+| TypeScript | typescript-language-server | =npm install -g typescript-language-server=                |
+| Ada        | ada_language_server (ALS)  | Build from source or install via Alire                     |
 
 ** Performance Tuning: Disabling Server Capabilities
 
@@ -296,12 +298,12 @@ Flymake is Emacs's built-in on-the-fly syntax checking framework. When eglot is 
 
 ** Key Commands
 
-| Key         | Command                          | Action                         |
-|-------------+----------------------------------+--------------------------------|
-| =M-n=       | =flymake-goto-next-error=        | Jump to next diagnostic        |
-| =M-p=       | =flymake-goto-prev-error=        | Jump to previous diagnostic    |
-| =C-c ! l=   | =flymake-show-buffer-diagnostics= | List all diagnostics in buffer |
-| =C-c ! p=   | =flymake-show-project-diagnostics= | List diagnostics across project |
+| Key       | Command                            | Action                          |
+|-----------+------------------------------------+---------------------------------|
+| =M-n=     | =flymake-goto-next-error=          | Jump to next diagnostic         |
+| =M-p=     | =flymake-goto-prev-error=          | Jump to previous diagnostic     |
+| =C-c ! l= | =flymake-show-buffer-diagnostics=  | List all diagnostics in buffer  |
+| =C-c ! p= | =flymake-show-project-diagnostics= | List diagnostics across project |
 
 Diagnostics appear as underlined text with faces indicating severity (error, warning, note).
 
@@ -552,13 +554,13 @@ DLL-NAME is the DLL filename without extension."
 
 Key bindings (all under =C-x p= prefix):
 
-| Key       | Command               | Action                    |
-|-----------+-----------------------+---------------------------|
-| =C-x p f= | =project-find-file=    | Find file in project      |
-| =C-x p g= | =project-find-regexp=  | Grep across project       |
-| =C-x p c= | =project-compile=      | Run compile in project    |
+| Key       | Command                    | Action                   |
+|-----------+----------------------------+--------------------------|
+| =C-x p f= | =project-find-file=        | Find file in project     |
+| =C-x p g= | =project-find-regexp=      | Grep across project      |
+| =C-x p c= | =project-compile=          | Run compile in project   |
 | =C-x p b= | =project-switch-to-buffer= | Switch to project buffer |
-| =C-x p d= | =project-dired=        | Dired at project root     |
+| =C-x p d= | =project-dired=            | Dired at project root    |
 
 ** Build Integration with compile
 
@@ -584,12 +586,12 @@ For offline Java builds (when Gradle caches are pre-populated):
 
 Xref is Emacs's cross-reference framework. Eglot provides the backend automatically.
 
-| Key   | Command                | Action                        |
-|-------+------------------------+-------------------------------|
-| =M-.= | =xref-find-definitions= | Go to definition              |
-| =M-?= | =xref-find-references=  | Find all references           |
-| =M-,= | =xref-go-back=          | Return to previous location   |
-| =C-M-.= | =xref-find-apropos=    | Search symbols by pattern     |
+| Key     | Command                 | Action                      |
+|---------+-------------------------+-----------------------------|
+| =M-.=   | =xref-find-definitions= | Go to definition            |
+| =M-?=   | =xref-find-references=  | Find all references         |
+| =M-,=   | =xref-go-back=          | Return to previous location |
+| =C-M-.= | =xref-find-apropos=     | Search symbols by pattern   |
 
 These work automatically when eglot is connected. No configuration needed.
 
@@ -688,13 +690,13 @@ Setting up Emacs in an environment with no internet access requires pre-staging 
 
 ** Checklist
 
-| Component              | How to Prepare                                    |
-|------------------------+---------------------------------------------------|
-| Emacs source tarball   | Download =emacs-30.1.tar.gz= (~70 MB)              |
-| Language server         | Download/build and copy the binary/jar            |
-| Debug adapter           | Download and copy the binary/jar                  |
+| Component                          | How to Prepare                               |
+|------------------------------------+----------------------------------------------|
+| Emacs source tarball               | Download =emacs-30.1.tar.gz= (~70 MB)        |
+| Language server                    | Download/build and copy the binary/jar       |
+| Debug adapter                      | Download and copy the binary/jar             |
 | Emacs packages (dape, corfu, etc.) | Clone repos, copy =.el= files to =site-lisp= |
-| Build tool caches       | Run a full build online to populate caches        |
+| Build tool caches                  | Run a full build online to populate caches   |
 
 ** Gradle Offline Builds (Java)
 
@@ -711,10 +713,10 @@ Then all subsequent builds work offline:
 
 Transfer =~/.gradle/= to the target machine. The essential directories are:
 
-| Directory              | Size  | Purpose                    |
-|------------------------+-------+----------------------------|
-| =wrapper/dists/=        | ~270M | Gradle distribution binary |
-| =caches/modules-2/=     | ~37M  | Downloaded dependency jars |
+| Directory           | Size  | Purpose                    |
+|---------------------+-------+----------------------------|
+| =wrapper/dists/=    | ~270M | Gradle distribution binary |
+| =caches/modules-2/= | ~37M  | Downloaded dependency jars |
 
 The rest (=generated-gradle-jars=, =transforms=, =daemon/=, etc.) is regenerated on first build.
 
@@ -727,7 +729,202 @@ dotnet restore --packages ./local-packages
 
 Then configure NuGet to use the local cache on the target.
 
-* Part 12: Putting It All Together
+* Part 12: Ada
+
+Ada is well supported in Emacs, but the tooling landscape is fragmented. The modern =ada-mode= on MELPA (sometimes called "ada-core" or "ada-lite") depends on Alire and the Ada Language Server (ALS) for navigation and project management. In practice, getting Alire to resolve and build correctly is brittle --- it often fails with version conflicts, missing crates, or network issues, especially in offline environments. The setup is significantly more complex than other languages and frequently doesn't work.
+
+The recommended approach is to use the *old ada-mode* (the version bundled with Emacs through Emacs 28), which provides robust Ada-aware navigation, indentation, and statement templates with no external tooling dependencies. Eglot with ALS can be layered on top when available, and debugging uses gud/gdb directly rather than dape, since there is no widely available DAP adapter for Ada.
+
+** Choosing an Ada Mode
+
+| Package        | Source              | Dependencies            | Navigation               |
+|----------------+---------------------+-------------------------+--------------------------|
+| Old ada-mode   | Emacs =<28 / manual | None                    | Built-in cross-reference |
+| MELPA ada-mode | MELPA               | Alire, ALS, ada-core    | LSP via ALS              |
+| ada-ts-mode    | MELPA               | Tree-sitter ada grammar | Syntax only              |
+
+Old ada-mode is the most reliable choice. It parses Ada source directly for indentation and navigation without requiring a language server, build tool, or network access. It works immediately on any Ada project.
+
+** Installing Old Ada-Mode
+
+Old ada-mode was removed from Emacs 29+. To use it, copy the files from an Emacs 28 distribution or from the [[https://github.com/emacs-mirror/emacs/tree/emacs-28/lisp/progmodes][Emacs 28 source tree]]:
+
+#+begin_src bash
+mkdir -p ~/.emacs.d/old-ada-mode
+# Copy these files from Emacs 28 lisp/progmodes:
+#   ada-mode.el, ada-prj.el, ada-stmt.el, ada-xref.el
+cp ada-mode.el ada-prj.el ada-stmt.el ada-xref.el ~/.emacs.d/old-ada-mode/
+#+end_src
+
+#+begin_src elisp
+(setq my/old-ada-mode (concat user-emacs-directory "old-ada-mode"))
+(when (file-exists-p my/old-ada-mode)
+  (use-package ada-mode
+    :load-path my/old-ada-mode))
+#+end_src
+
+** File Associations
+
+#+begin_src elisp
+(cl-loop for ext in '("\\.gpr$" "\\.ada$" "\\.ads$" "\\.adb$")
+         do (add-to-list 'auto-mode-alist (cons ext 'ada-mode)))
+#+end_src
+
+** Eglot with Ada Language Server (Optional)
+
+When ALS is available, eglot can provide LSP features on top of old ada-mode. ALS reads GNAT project files (=.gpr=) for project structure.
+
+*** Installing ALS
+
+ALS can be built from source or installed via Alire (when it cooperates):
+#+begin_src bash
+# Via Alire (if available)
+alr get ada_language_server
+cd ada_language_server*
+alr build
+
+# Or download a pre-built binary from:
+# https://github.com/AdaCore/ada_language_server/releases
+#+end_src
+
+*** Eglot Configuration for ALS
+
+#+begin_src elisp
+(add-to-list 'eglot-server-programs
+             '((ada-mode ada-ts-mode) . ("ada_language_server")))
+#+end_src
+
+To point ALS at a specific =.gpr= project file, create a =.dir-locals.el= in the project root:
+
+#+begin_src elisp
+;; .dir-locals.el
+((ada-mode . ((eglot-workspace-configuration
+               . ((ada . (:projectFile "my_project.gpr")))))))
+#+end_src
+
+A helper function can generate this from dired:
+
+#+begin_src elisp
+(defun my/eglot-dir-locals ()
+  "Create .dir-locals.el for eglot ada-mode using the selected DIRED path."
+  (interactive)
+  (add-dir-local-variable
+   'ada-mode
+   'eglot-workspace-configuration
+   `((ada . (:projectFile ,(dired-get-filename))))))
+#+end_src
+
+** Multi-Backend Navigation
+
+Since Ada projects may use eglot, old ada-mode, or etags depending on the environment, a dispatcher function routes =M-.= and =M-,= to the correct backend automatically:
+
+#+begin_src elisp
+(defun buffer-in-eglot-mode-p ()
+  (if (fboundp 'eglot-managed-p)
+      (eglot-managed-p)
+    nil))
+
+(defun buffer-in-old-ada-mode-p ()
+  (if (boundp 'ada-prj-default-project-file)
+      t
+    nil))
+
+(defun buffer-in-tags-mode-p ()
+  (if tags-table-list
+      t
+    nil))
+
+(defun my/ada-find-definitions ()
+  "Find definitions using the best available backend."
+  (interactive)
+  (cond
+   ((buffer-in-eglot-mode-p)
+    (message "xref: eglot")
+    (xref-find-definitions (xref-backend-identifier-at-point 'eglot)))
+   ((buffer-in-old-ada-mode-p)
+    (message "xref: old-ada-mode")
+    (setq ada-xref-other-buffer nil)
+    (ada-goto-declaration (point)))
+   ((buffer-in-tags-mode-p)
+    (message "xref: etags")
+    (my/xref-find-definitions (xref-backend-identifier-at-point 'etags)))
+   (t
+    (message "xref: fallback etags")
+    (my/xref-find-definitions (xref-backend-identifier-at-point 'etags)))))
+
+(defun my/ada-find-definition-pop ()
+  "Pop back from definition using the matching backend."
+  (interactive)
+  (cond
+   ((buffer-in-eglot-mode-p)
+    (xref-quit-and-pop-marker-stack))
+   ((buffer-in-old-ada-mode-p)
+    (ada-xref-goto-previous-reference))
+   (t
+    (xref-go-back))))
+
+(with-eval-after-load 'ada-mode
+  (define-key ada-mode-map (kbd "M-.") 'my/ada-find-definitions)
+  (define-key ada-mode-map (kbd "M-,") 'my/ada-find-definition-pop))
+#+end_src
+
+The fallback chain is: eglot (LSP) -> old ada-mode (built-in cross-reference) -> etags (static tags). This means navigation works in any environment --- from a fully connected workstation with ALS to an air-gapped machine with only the source code and a TAGS file.
+
+** Debugging Ada with GUD/GDB
+
+Ada programs compiled with GNAT are native binaries, so GDB supports them directly. Emacs's built-in GUD (Grand Unified Debugger) interface provides the debugging UI. There is no need for dape or a DAP adapter.
+
+*** Compiling for Debug
+
+#+begin_src bash
+# Compile with debug symbols
+gnatmake -g -O0 main.adb
+
+# Or via a .gpr project file
+gprbuild -Pmy_project.gpr -XBUILD=debug
+#+end_src
+
+*** GDB Configuration
+
+#+begin_src elisp
+(setq gdb-display-io-nopopup 1)
+(setq gdb-many-windows t)         ; Show locals, stack, breakpoints, I/O
+
+(global-set-key (kbd "<f9>")  'gud-break)
+(global-set-key (kbd "<f10>") 'gud-next)
+(global-set-key (kbd "<f11>") 'gud-step)
+#+end_src
+
+*** Usage
+
+Start a debug session with =M-x gdb=, then enter the GDB command line:
+
+#+begin_example
+gdb -i=mi /path/to/my_program
+#+end_example
+
+With =gdb-many-windows= set to =t=, Emacs splits into a multi-pane layout showing source, locals, stack, breakpoints, and I/O --- similar to a traditional IDE debugger view.
+
+| Key   | Command     | Action         |
+|-------+-------------+----------------|
+| =F9=  | =gud-break= | Set breakpoint |
+| =F10= | =gud-next=  | Step over      |
+| =F11= | =gud-step=  | Step into      |
+
+Additional GUD commands available in the GDB buffer: =gud-cont= (continue), =gud-finish= (step out), =gud-remove= (remove breakpoint), =gud-print= (print expression).
+
+** Windows-Specific: GNAT on PATH
+
+On Windows, add the GNAT installation to the Emacs PATH:
+
+#+begin_src elisp
+(when (eq system-type 'windows-nt)
+  ;; Add to your xPaths list (see Part 10):
+  ;; "c:/GNAT/2021/bin"
+  )
+#+end_src
+
+* Part 13: Putting It All Together
 
 Here is a minimal but complete =init.el= that configures the full stack. Adapt the language-specific sections for your needs.
 
@@ -762,6 +959,9 @@ Here is a minimal but complete =init.el= that configures the full stack. Adapt t
   ;; C#: csharp-ls
   ;; (add-to-list 'eglot-server-programs
   ;;              '((csharp-mode csharp-ts-mode) . ("csharp-ls")))
+  ;; Ada: ALS (optional, if available)
+  ;; (add-to-list 'eglot-server-programs
+  ;;              '((ada-mode ada-ts-mode) . ("ada_language_server")))
   )
 
 ;; --- Flymake (Diagnostics) ---
@@ -799,6 +999,22 @@ Here is a minimal but complete =init.el= that configures the full stack. Adapt t
    ("<S-f11>" . dape-step-out))
   :config
   (setq dape-request-timeout 30))
+
+;; --- Ada (Old Ada-Mode) ---
+(setq my/old-ada-mode (concat user-emacs-directory "old-ada-mode"))
+(when (file-exists-p my/old-ada-mode)
+  (use-package ada-mode
+    :load-path my/old-ada-mode))
+
+(cl-loop for ext in '("\\.gpr$" "\\.ada$" "\\.ads$" "\\.adb$")
+         do (add-to-list 'auto-mode-alist (cons ext 'ada-mode)))
+
+;; --- GUD/GDB (Ada Debugging) ---
+(setq gdb-display-io-nopopup 1)
+(setq gdb-many-windows t)
+(global-set-key (kbd "<f9>")  'gud-break)
+(global-set-key (kbd "<f10>") 'gud-next)
+(global-set-key (kbd "<f11>") 'gud-step)
 #+end_src
 
 * Troubleshooting
