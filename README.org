@@ -740,10 +740,13 @@ The recommended approach is to use the *old ada-mode* (the version bundled with 
 | Package        | Source              | Dependencies            | Navigation               |
 |----------------+---------------------+-------------------------+--------------------------|
 | Old ada-mode   | Emacs =<28 / manual | None                    | Built-in cross-reference |
+| ada-light-mode | [[https://github.com/sebastianpoeplau/ada-light-mode][GitHub]]             | compat                  | Eglot (LSP via ALS)      |
 | MELPA ada-mode | MELPA               | Alire, ALS, ada-core    | LSP via ALS              |
 | ada-ts-mode    | MELPA               | Tree-sitter ada grammar | Syntax only              |
 
 Old ada-mode is the most reliable choice. It parses Ada source directly for indentation and navigation without requiring a language server, build tool, or network access. It works immediately on any Ada project.
+
+ada-light-mode is a good alternative if you want a lightweight major mode that is designed from the ground up to work with eglot. It provides syntax highlighting, comment/string recognition, and imenu support for subprograms, packages, and type definitions --- but delegates navigation, completion, and diagnostics entirely to eglot and ALS. Its only dependency is the =compat= library.
 
 ** Installing Old Ada-Mode
 
@@ -761,6 +764,38 @@ cp ada-mode.el ada-prj.el ada-stmt.el ada-xref.el ~/.emacs.d/old-ada-mode/
 (when (file-exists-p my/old-ada-mode)
   (use-package ada-mode
     :load-path my/old-ada-mode))
+#+end_src
+
+** Ada-Light-Mode (Alternative)
+
+[[https://github.com/sebastianpoeplau/ada-light-mode][ada-light-mode]] is a minimal major mode that provides syntax highlighting, comment handling, and imenu navigation with no heavy dependencies. It is designed to pair with eglot for all LSP features.
+
+#+begin_src elisp
+(use-package ada-light-mode
+  ;; :ensure t  ; or :load-path for offline
+  :mode ("\\.adb\\'" "\\.ads\\'" "\\.ada\\'")
+  :hook (ada-light-mode . eglot-ensure))
+#+end_src
+
+Note that ada-light-mode defines its own major mode (=ada-light-mode=), so eglot needs to know about it:
+
+#+begin_src elisp
+(add-to-list 'eglot-server-programs
+             '(ada-light-mode . ("ada_language_server")))
+#+end_src
+
+The =.dir-locals.el= for pointing ALS at a project file uses =ada-light-mode= instead of =ada-mode=:
+
+#+begin_src elisp
+;; .dir-locals.el
+((ada-light-mode . ((eglot-workspace-configuration
+                     . (:ada (:projectFile "/path/to/project.gpr"))))))
+#+end_src
+
+If the language server's on-type formatting interferes with Emacs indentation, disable it:
+
+#+begin_src elisp
+(setq eglot-ignored-server-capabilities '(:documentOnTypeFormattingProvider))
 #+end_src
 
 ** File Associations
