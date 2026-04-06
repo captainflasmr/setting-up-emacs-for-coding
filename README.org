@@ -54,8 +54,18 @@ sudo apt install emacs
 
 *** Linux (From Source)
 
-If your distribution ships an older Emacs (e.g. openSUSE Leap 15.4 ships 27.2), build from source:
+If your distribution ships an older Emacs (e.g. SLES 15 / openSUSE Leap 15.x ships Emacs 27.2), build from source. This is common on enterprise distributions where package versions are frozen for the support lifecycle.
 
+On SLES 15, install the build dependencies first:
+#+begin_src bash
+sudo zypper install -t pattern devel_basis
+sudo zypper install gtk3-devel libjpeg-devel libpng-devel \
+    giflib-devel libtiff-devel libXpm-devel gnutls-devel \
+    libxml2-devel cairo-devel harfbuzz-devel librsvg-devel \
+    ncurses-devel texinfo
+#+end_src
+
+Then build:
 #+begin_src bash
 mkdir -p ~/emacs-builds && cd ~/emacs-builds
 tar xzf emacs-30.1.tar.gz
@@ -964,6 +974,8 @@ On Windows, add the GNAT installation to the Emacs PATH:
 
 C and C++ have excellent Emacs support out of the box. Emacs ships with =cc-mode= (=c-mode= and =c++-mode=) for editing, and eglot works with clangd with zero configuration since clangd is in eglot's default server list. Debugging uses gud/gdb, the same setup as Ada. The main area that benefits from configuration is the build system integration, particularly CMake.
 
+Enterprise distributions like SLES 15 (openSUSE Leap 15.x) ship significantly older toolchains and may lack clangd entirely, so this section includes specific guidance for those environments.
+
 ** Language Server: clangd
 
 Clangd ships with LLVM/Clang and is the recommended language server for C/C++. Eglot recognises it automatically --- no =eglot-server-programs= entry is needed.
@@ -980,11 +992,36 @@ sudo dnf install clang-tools-extra
 # Ubuntu/Debian
 sudo apt install clangd
 
+# openSUSE Tumbleweed
+sudo zypper install clang-tools
+
 # macOS
 brew install llvm
 #+end_src
 
 On Windows, download LLVM from [[https://releases.llvm.org/][the releases page]] and add the =bin= directory to your Emacs PATH (see Part 10).
+
+**** SLES 15 / openSUSE Leap 15.x
+
+SLES 15 does not ship clangd in its default repositories. There are several options:
+
+1. *Install from the LLVM module* (if available in your SLES subscription):
+   #+begin_src bash
+   sudo SUSEConnect -p sle-module-development-tools/15.5/x86_64
+   sudo zypper install clang-tools
+   #+end_src
+
+2. *Download a pre-built static binary* from [[https://github.com/clangd/clangd/releases][the clangd releases page]] on a connected machine and copy it across. This is often the simplest approach for air-gapped SLES systems:
+   #+begin_src bash
+   # On the connected machine
+   wget https://github.com/clangd/clangd/releases/download/<version>/clangd-linux-<version>.zip
+   unzip clangd-linux-<version>.zip
+
+   # On the SLES machine
+   cp clangd_<version>/bin/clangd ~/.local/bin/
+   #+end_src
+
+3. *Build LLVM from source* --- this is time-consuming but works when no other option is available. Requires a C++17 compiler (see the GCC section below).
 
 *** Eglot Configuration
 
@@ -1021,6 +1058,48 @@ Clangd looks for =compile_commands.json= in the project root or a =build/= subdi
 #+begin_src bash
 ln -s build/linux/debug/compile_commands.json .
 #+end_src
+
+** GCC Toolchain on SLES 15
+
+SLES 15 ships GCC 7 by default, which lacks full C++17/C++20 support. Modern C++ projects typically need a newer compiler.
+
+*** Using the Development Tools Module
+
+SUSE provides newer GCC versions via the Development Tools module:
+
+#+begin_src bash
+# Enable the module (requires SLES subscription or registration)
+sudo SUSEConnect -p sle-module-development-tools/15.5/x86_64
+
+# Install a newer GCC (version availability depends on SLES service pack)
+sudo zypper install gcc12 gcc12-c++
+# or
+sudo zypper install gcc13 gcc13-c++
+#+end_src
+
+The versioned packages install alongside the system GCC. Use =update-alternatives= or invoke directly:
+
+#+begin_src bash
+# Invoke directly
+CC=gcc-12 CXX=g++-12 cmake --preset build/linux/debug
+
+# Or set alternatives system-wide
+sudo update-alternatives --install /usr/bin/gcc gcc /usr/bin/gcc-12 12 \
+    --slave /usr/bin/g++ g++ /usr/bin/g++-12
+#+end_src
+
+*** CMake on SLES 15
+
+SLES 15 ships CMake 3.x (e.g. 3.20 on SP5), which may be too old for CMake presets (requires 3.21+) or modern =FetchContent= usage. Install a newer version:
+
+#+begin_src bash
+# Download the official binary release (no build required)
+wget https://github.com/Kitware/CMake/releases/download/v3.31.6/cmake-3.31.6-linux-x86_64.tar.gz
+tar xzf cmake-3.31.6-linux-x86_64.tar.gz -C ~/.local
+# Add ~/.local/cmake-3.31.6-linux-x86_64/bin to PATH
+#+end_src
+
+For offline environments, download the tarball on a connected machine and copy it across. The binary release has no dependencies beyond glibc.
 
 ** Building with CMake
 
@@ -1175,6 +1254,21 @@ find . -name "*.c" -o -name "*.cpp" -o -name "*.h" | xargs etags
 #+end_src
 
 Then load the tags table in Emacs with =M-x visit-tags-table=.
+
+** SLES 15 Quick Reference
+
+Summary of what needs to be staged or installed for a C/C++ development environment on SLES 15 / openSUSE Leap 15.x:
+
+| Component    | System default         | What you need                          | How                                   |
+|--------------+------------------------+----------------------------------------+---------------------------------------|
+| Emacs        | 27.2                   | 30.1+                                  | Build from source (see Part 1)        |
+| GCC          | 7.5                    | 12+ for C++17/20                       | =zypper install gcc12 gcc12-c++=      |
+| CMake        | 3.20 (SP5)             | 3.21+ for presets                      | Download binary release from Kitware  |
+| clangd       | Not available          | Any recent release                     | Download static binary or build LLVM  |
+| GDB          | 12.1+                  | Ships with SLES, usually sufficient    | =zypper install gdb=                  |
+| Build deps   | Partial                | =devel_basis= pattern + library -devel | =zypper install -t pattern devel_basis= |
+
+For air-gapped SLES systems, download all of the above on a connected machine, transfer via USB or network share, and install to =$HOME= paths to avoid needing root access. The binary releases of CMake and clangd are self-contained and need no installation --- just extract and add to PATH.
 
 * Part 14: Putting It All Together
 
