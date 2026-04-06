@@ -9,12 +9,13 @@
 
 This guide documents how to set up Emacs as a modern development environment, built entirely on packages that are either built-in or require minimal external dependencies. The approach favours Emacs's native infrastructure --- eglot over lsp-mode, flymake over flycheck, corfu over company --- and emphasises portability, including air-gapped and restricted environments.
 
-Four concrete worked examples are covered in detail:
+Five concrete worked examples are covered in detail:
 
 - *Java* (Linux): eglot + JDTLS + dape with java-debug-adapter
 - *C#/.NET* (Windows): eglot + csharp-ls + dape with netcoredbg
 - *Ada* (Linux/Windows): old ada-mode + eglot + gud/gdb
 - *C/C++* (Linux/Windows): eglot + clangd + CMake + gud/gdb
+- *TypeScript* (cross-platform): eglot + typescript-language-server + dape
 
 The principles and patterns apply equally to any language with LSP and DAP support (Python, Go, Rust, etc.).
 
@@ -645,6 +646,29 @@ Visual directory diff tool within Emacs:
   :bind ("C-c z d" . ztree-diff))
 #+end_src
 
+** protobuf-mode (Protocol Buffers)
+
+Projects that use gRPC or Protocol Buffers will have =.proto= definition files. =protobuf-mode= provides syntax highlighting and indentation for these:
+
+#+begin_src elisp
+(use-package protobuf-mode
+  ;; :ensure t  ; or :load-path for offline
+  :mode ("\\.proto\\'"))
+#+end_src
+
+For offline installation, =protobuf-mode= is a single file with no dependencies:
+#+begin_src bash
+git clone https://github.com/protocolbuffers/protobuf.git /tmp/protobuf
+cp /tmp/protobuf/editors/protobuf-mode.el ~/.emacs.d/site-lisp/
+#+end_src
+
+#+begin_src elisp
+;; Offline load
+(add-to-list 'load-path "~/.emacs.d/site-lisp")
+(require 'protobuf-mode)
+(add-to-list 'auto-mode-alist '("\\.proto\\'" . protobuf-mode))
+#+end_src
+
 ** File Mode Associations
 
 #+begin_src elisp
@@ -1114,6 +1138,78 @@ For offline environments, download the tarball on a connected machine and copy i
 (add-to-list 'auto-mode-alist '("CMakeLists.txt\\'" . cmake-mode))
 #+end_src
 
+*** Ninja Build System
+
+Many CMake projects use [[https://ninja-build.org/][Ninja]] as the build backend rather than Make. Ninja is faster for incremental builds and is commonly specified in =CMakePresets.json= via ="generator": "Ninja Multi-Config"=.
+
+#+begin_src bash
+# Arch Linux
+sudo pacman -S ninja
+
+# Fedora
+sudo dnf install ninja-build
+
+# Ubuntu/Debian
+sudo apt install ninja-build
+
+# openSUSE Tumbleweed
+sudo zypper install ninja
+#+end_src
+
+**** SLES 15
+
+Ninja is not in the default SLES 15 repositories. Install from the Development Tools module or download a static binary:
+
+#+begin_src bash
+# If Development Tools module is enabled
+sudo zypper install ninja
+
+# Or download the static binary (no dependencies, single file)
+wget https://github.com/ninja-build/ninja/releases/download/v1.12.1/ninja-linux.zip
+unzip ninja-linux.zip -d ~/.local/bin
+#+end_src
+
+The Ninja binary is a single static executable, making it easy to deploy on air-gapped systems.
+
+*** Protobuf Library (C++ Projects)
+
+C++ projects that use Protocol Buffers (e.g. for gRPC) need the Protobuf library and compiler (=protoc=) installed. CMake finds it via =find_package(Protobuf)=.
+
+#+begin_src bash
+# Arch Linux
+sudo pacman -S protobuf
+
+# Fedora
+sudo dnf install protobuf-devel protobuf-compiler
+
+# Ubuntu/Debian
+sudo apt install libprotobuf-dev protobuf-compiler
+
+# openSUSE Tumbleweed
+sudo zypper install protobuf-devel
+#+end_src
+
+**** SLES 15
+
+SLES 15 may ship an older Protobuf version. If the project requires a specific version (e.g. 3.21.x), build from source:
+
+#+begin_src bash
+# On a connected machine
+wget https://github.com/protocolbuffers/protobuf/releases/download/v21.12/protobuf-cpp-3.21.12.tar.gz
+tar xzf protobuf-cpp-3.21.12.tar.gz
+cd protobuf-3.21.12
+./configure --prefix=$HOME/.local
+make -j$(nproc)
+make install
+#+end_src
+
+Then tell CMake where to find it:
+#+begin_src bash
+cmake --preset gcc-amd64 -DProtobuf_DIR=$HOME/.local/lib/cmake/protobuf
+#+end_src
+
+For offline environments, build on a connected machine and copy the =$HOME/.local= prefix across.
+
 *** CMake Workflow with compile
 
 The standard workflow is configure, build, and run via =M-x compile=:
@@ -1238,9 +1334,7 @@ Unlike Ada, C/C++ has good DAP support via several debug adapters. If you prefer
     :cwd "/path/to/project"))
 
 ;; Using cppdbg (part of the C/C++ extension for VS Code)
-;; Download OpenDebugAD7 from:
-;; https://github.com/nicknisi/dotfiles/issues
-;; or extract from the VS Code extension
+;; Extract OpenDebugAD7 from the VS Code C/C++ extension
 #+end_src
 
 =lldb-dap= (formerly =lldb-vscode=) ships with LLVM and is the easiest option --- if LLVM is installed, it is likely already on your PATH.
@@ -1264,13 +1358,191 @@ Summary of what needs to be staged or installed for a C/C++ development environm
 | Emacs        | 27.2                   | 30.1+                                  | Build from source (see Part 1)        |
 | GCC          | 7.5                    | 12+ for C++17/20                       | =zypper install gcc12 gcc12-c++=      |
 | CMake        | 3.20 (SP5)             | 3.21+ for presets                      | Download binary release from Kitware  |
+| Ninja        | Not available          | 1.10+                                  | Download static binary from GitHub    |
+| Protobuf     | May be outdated        | Version required by project            | Build from source to =$HOME/.local=   |
 | clangd       | Not available          | Any recent release                     | Download static binary or build LLVM  |
 | GDB          | 12.1+                  | Ships with SLES, usually sufficient    | =zypper install gdb=                  |
 | Build deps   | Partial                | =devel_basis= pattern + library -devel | =zypper install -t pattern devel_basis= |
 
-For air-gapped SLES systems, download all of the above on a connected machine, transfer via USB or network share, and install to =$HOME= paths to avoid needing root access. The binary releases of CMake and clangd are self-contained and need no installation --- just extract and add to PATH.
+For air-gapped SLES systems, download all of the above on a connected machine, transfer via USB or network share, and install to =$HOME= paths to avoid needing root access. The binary releases of CMake, Ninja, and clangd are self-contained and need no installation --- just extract and add to PATH.
 
-* Part 14: Putting It All Together
+* Part 14: TypeScript
+
+TypeScript works well with eglot out of the box. The =typescript-language-server= is in eglot's default server list, and =typescript-mode= from MELPA provides solid regexp-based syntax highlighting with no dependencies beyond Emacs itself. Debugging uses dape with the =js-debug= adapter.
+
+** Major Mode: typescript-mode
+
+=typescript-mode= is available on MELPA and provides regexp-based syntax highlighting that works everywhere without additional tooling. This makes it the better choice for offline and air-gapped environments, since tree-sitter modes require compiling and deploying platform-specific grammar shared libraries.
+
+#+begin_src elisp
+(use-package typescript-mode
+  ;; :ensure t  ; or :load-path for offline
+  :mode ("\\.ts\\'"))
+#+end_src
+
+For TSX files (React), =web-mode= handles the mixed HTML/TypeScript syntax well:
+
+#+begin_src elisp
+(add-to-list 'auto-mode-alist '("\\.tsx\\'" . web-mode))
+#+end_src
+
+Emacs 30 also includes =typescript-ts-mode= and =tsx-ts-mode= which use tree-sitter for richer highlighting, but these require building and installing grammar shared libraries (=libtree-sitter-typescript.so=, =libtree-sitter-tsx.so=) which adds complexity, especially on offline systems.
+
+** Language Server: typescript-language-server
+
+Eglot recognises =typescript-language-server= automatically for =typescript-mode=. No =eglot-server-programs= entry is needed.
+
+*** Installing the Language Server
+
+=typescript-language-server= is an npm package that wraps the TypeScript compiler's language services:
+
+#+begin_src bash
+npm install -g typescript-language-server typescript
+#+end_src
+
+Both packages are needed --- =typescript-language-server= provides the LSP protocol layer, and =typescript= (=tsserver=) provides the actual language intelligence.
+
+For offline environments, pack the packages on a connected machine:
+#+begin_src bash
+# On connected machine
+mkdir ts-offline && cd ts-offline
+npm pack typescript-language-server typescript
+# Copy the .tgz files to the target
+
+# On target machine
+npm install -g typescript-language-server-*.tgz typescript-*.tgz
+#+end_src
+
+*** Eglot Configuration
+
+#+begin_src elisp
+(use-package eglot
+  :hook
+  ((typescript-mode . eglot-ensure)))
+#+end_src
+
+No =eglot-server-programs= entry is required. Eglot's built-in defaults map =typescript-mode= to =typescript-language-server --stdio=.
+
+*** Project Detection
+
+=typescript-language-server= uses =tsconfig.json= (or =jsconfig.json=) to determine the project root and compiler options. Ensure your project has one:
+
+#+begin_src bash
+# Generate a default tsconfig.json
+npx tsc --init
+#+end_src
+
+Eglot will also use =project.el= to detect the project root via =.git=, which usually aligns with where =tsconfig.json= lives.
+
+** Formatting and Linting
+
+*** Formatter Integration
+
+TypeScript projects commonly use Prettier or the built-in TypeScript formatter. The language server provides formatting via eglot:
+
+- =C-c C-f= (=eglot-format=) --- format the current region or buffer using the language server's formatter
+- =C-c C-a= (=eglot-code-actions=) --- access quick fixes and refactorings
+
+*** ESLint
+
+For ESLint integration, flymake picks up diagnostics from the language server automatically. If your project uses ESLint alongside TypeScript, the language server will report relevant diagnostics.
+
+For projects that rely heavily on ESLint rules beyond what the TypeScript compiler checks, consider adding =eslint= as an additional flymake backend via =flymake-eslint= (available on MELPA).
+
+** Debugging TypeScript with Dape
+
+TypeScript debugging uses Microsoft's =js-debug= adapter, which supports both Node.js and browser-based TypeScript/JavaScript.
+
+*** Installing js-debug
+
+Dape expects =js-debug= to be installed under =dape-adapter-dir= (defaults to =~/.emacs.d/debug-adapters/=). Build it from Microsoft's =vscode-js-debug= repository on GitHub:
+
+#+begin_src bash
+git clone https://github.com/microsoft/vscode-js-debug /tmp/vscode-js-debug
+cd /tmp/vscode-js-debug
+npm install
+npm run compile
+cp -r /tmp/vscode-js-debug ~/.emacs.d/debug-adapters/js-debug
+#+end_src
+
+For offline environments, run these steps on a connected machine and copy the =js-debug= directory across to the target.
+
+*** Launch Configurations
+
+Dape includes built-in configurations for =js-debug=:
+
+#+begin_src elisp
+;; Debug a Node.js TypeScript file (using ts-node or tsx)
+;; M-x dape, then select:
+;;   js-debug-node :program "/path/to/app.ts" :runtimeArgs ["--loader" "tsx"]
+
+;; Debug compiled JavaScript
+;; M-x dape, then select:
+;;   js-debug-node :program "/path/to/dist/app.js"
+#+end_src
+
+For a custom launch configuration:
+
+#+begin_src elisp
+(add-to-list 'dape-configs
+  '(ts-node
+    modes (typescript-mode)
+    command "js-debug"
+    command-args ("dapDebugServer")
+    :type "pwa-node"
+    :request "launch"
+    :runtimeExecutable "npx"
+    :runtimeArgs ["tsx"]
+    :program "/path/to/app.ts"
+    :cwd "/path/to/project"))
+#+end_src
+
+*** Debugging in the Browser
+
+For frontend TypeScript (e.g. a Vite or webpack dev server), use the Chrome/Edge debug configuration:
+
+#+begin_src elisp
+;; M-x dape, then select:
+;;   js-debug-chrome :url "http://localhost:5173"
+#+end_src
+
+This attaches to a running browser instance. Start your dev server first (=npm run dev=), then launch the debug session.
+
+** Node.js and npm
+
+*** Managing Node.js Versions
+
+On systems where the global Node.js is too old (SLES 15 ships Node.js 18 via the Web and Scripting Module, but your project may need a newer version), use a version manager:
+
+#+begin_src bash
+# Using nvm (install to ~/.nvm, no root needed)
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.3/install.sh | bash
+nvm install 22
+nvm use 22
+#+end_src
+
+For offline environments, download the Node.js binary tarball:
+#+begin_src bash
+# On connected machine
+wget https://nodejs.org/dist/v22.14.0/node-v22.14.0-linux-x64.tar.xz
+
+# On target machine
+tar xf node-v22.14.0-linux-x64.tar.xz -C ~/.local
+# Add ~/.local/node-v22.14.0-linux-x64/bin to PATH
+#+end_src
+
+*** Ensuring Emacs Finds Node
+
+If Node.js is installed to a non-standard location, ensure Emacs can find it:
+
+#+begin_src elisp
+;; Add node to exec-path so eglot can find typescript-language-server
+(add-to-list 'exec-path (expand-file-name "~/.local/node-v22.14.0-linux-x64/bin"))
+(setenv "PATH" (concat (expand-file-name "~/.local/node-v22.14.0-linux-x64/bin")
+                       ":" (getenv "PATH")))
+#+end_src
+
+* Part 15: Putting It All Together
 
 Here is a minimal but complete =init.el= that configures the full stack. Adapt the language-specific sections for your needs.
 
@@ -1296,7 +1568,8 @@ Here is a minimal but complete =init.el= that configures the full stack. Adapt t
   ((java-mode . eglot-ensure)
    (csharp-mode . eglot-ensure)
    (c-mode . eglot-ensure)
-   (c++-mode . eglot-ensure))
+   (c++-mode . eglot-ensure)
+   (typescript-mode . eglot-ensure))
   :config
   ;; Java: JDTLS
   (add-to-list 'eglot-server-programs
@@ -1367,6 +1640,12 @@ Here is a minimal but complete =init.el= that configures the full stack. Adapt t
 ;; --- CMake ---
 (use-package cmake-mode)
 (add-to-list 'auto-mode-alist '("CMakeLists.txt\\'" . cmake-mode))
+
+;; --- TypeScript ---
+(use-package typescript-mode
+  :ensure t
+  :mode ("\\.ts\\'"))
+(add-to-list 'auto-mode-alist '("\\.tsx\\'" . web-mode))
 #+end_src
 
 * Troubleshooting
